@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Multi-Page Quiz App (20 per page)</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .quiz-container {
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      padding: 30px;
+      max-width: 1000px;
+      width: 100%;
+      overflow-y: auto;
+      max-height: 90vh;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .header h1 {
+      color: #2c3e50;
+      margin: 0;
+      font-size: 2.5em;
+    }
+    #score {
+      color: #3498db;
+      font-size: 1.5em;
+      font-weight: bold;
+    }
+    .question {
+      background: #ecf0f1;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+    }
+    .question:hover {
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    }
+    .question h3 {
+      color: #2c3e50;
+      margin: 0 0 15px 0;
+      font-size: 1.1em;
+    }
+    .options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .option {
+      background: #f9f9f9;
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 2px solid #ddd;
+    }
+    .option:hover:not(.selected) {
+      background: #e0e0e0;
+      border-color: #3498db;
+    }
+    .option.selected.correct {
+      background: #2ecc71;
+      color: white;
+      border-color: #27ae60;
+    }
+    .option.selected.incorrect {
+      background: #e74c3c;
+      color: white;
+      border-color: #c0392b;
+    }
+    .navigation {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 30px;
+    }
+    .nav-btn {
+      padding: 12px 25px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: background 0.3s ease;
+    }
+    .nav-btn:hover {
+      background: #2980b9;
+    }
+    .nav-btn:disabled {
+      background: #bdc3c7;
+      cursor: not-allowed;
+    }
+    .shuffle-controls {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .shuffle-btn {
+      padding: 10px 20px;
+      background: #e67e22;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: background 0.3s ease;
+    }
+    .shuffle-btn:hover {
+      background: #d35400;
+    }
+  </style>
+</head>
+<body>
+  <div class="quiz-container">
+    <div class="header">
+      <h1>Quiz App</h1>
+      <div id="score">Score: 0 / 0</div>
+    </div>
+    <div class="shuffle-controls">
+      <button class="shuffle-btn" onclick="shuffleQuestions()">Shuffle Questions</button>
+      <button class="shuffle-btn" onclick="noShuffle()">No Shuffle</button>
+    </div>
+    <div id="questions"></div>
+    <div class="navigation">
+      <button class="nav-btn" id="prevBtn" onclick="prevPage()">Previous</button>
+      <button class="nav-btn" id="nextBtn" onclick="nextPage()">Next</button>
+    </div>
+  </div>
+
+  <script>
+    let questions = [];
+    let currentPage = 0;
+    let score = 0;
+    const questionsPerPage = 20;
+    let totalPages = 0;
+    let answers = [];
+    let currentQuestions = [];
+
+    // Sample: Replace with your full questions list
+    const allQuestions = [
+    {
+        question: "Which of the following best describes a key limitation of the Boolean model in Information Retrieval?",
+        options: [
+          "It retrieves documents that logically satisfy the query but does not consider how often terms appear.",
+          "It considers the term frequency in each document, which leads to noise in ranking.",
+          "It uses cosine similarity, which is computationally expensive.",
+          "It assigns weights based on TF-IDF, which may misrepresent rare terms."
+        ],
+        answer: 0
+      },
+      {
+        question: "In the Text and Graph Analysis lab, when using the BIO tagging scheme, how would you label a token that is inside an entity?",
+        options: [
+          "I-LABEL",
+          "B-LABEL",
+          "O",
+          "IN",
+          "OUT"
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the bag of words approach?",
+        options: [
+          "An approach where the rows are the documents, and the columns are the frequency of the vocabulary terms in each document, where each column is its own unique word.",
+          "An approach where several words are taken from the overall vocabulary and weighted to find the relative frequency in other documents.",
+          "An approach where the vocabulary frequency is divided by the overall frequency in the documents.",
+          "An approach where the words are vectorized and divided by the document number.",
+          "An approach where words are inversely proportional to the document overall vocabulary count."
+        ],
+        answer: 0
+      },
+      {
+        question: "Why must the stochastic adjacency matrix M used in PageRank be modified when the web graph contains dead-end nodes?",
+        options: [
+          "Because dead ends introduce columns of zeros in M, violating the column stochastic property required for computing a valid stationary distribution in PageRank.",
+          "Because dead ends cause the inlinking pages to accumulate infinite PageRank scores due to unbalanced link flow.",
+          "Because dead ends prevent the application of the random teleportation mechanism.",
+          "Because dead ends disrupt the structure of the web graph, making the Markov chain irreducible and non-ergodic.",
+          "Because dead ends create rank sinks that attract high PageRank."
+        ],
+        answer: 0
+      },
+      {
+        question: "In the TF-IDF weighting scheme, why is inverse document frequency (IDF) used?",
+        options: [
+          "To give higher importance to terms that appear in many documents.",
+          "To penalize terms that are too common across the document collection.",
+          "To count how frequently a term appears in a single document.",
+          "To normalize all term weights to a value between 0 and 1.",
+          "To increase the weight of stopwords during vector construction."
+        ],
+        answer: 1
+      },
+      {
+        question: "Which of the following statements about TF-IDF term weighting is correct?",
+        options: [
+          "TF-IDF combines term frequency (TF) with inverse document frequency (IDF) to reflect both local importance and global rarity of terms.",
+          "The IDF component increases for terms that appear in more documents, reducing their discriminative power.",
+          "TF-IDF weights are calculated by dividing the raw term frequency by the total number of terms in the document.",
+          "In the TF-IDF formula, N represents the average number of terms per document in the collection.",
+          "TF-IDF is primarily used in Boolean retrieval models to determine logical query matches."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following is NOT an appropriate application of knowledge bases?",
+        options: [
+          "Storing unrelated, unstructured data for fast lookups",
+          "Improving what information a search engine can present",
+          "Supporting automatic Q&A systems",
+          "Providing situational awareness for current events, such as road closings",
+          "Allowing queries for domain-specific information, such as for legal or medical purposes"
+        ],
+        answer: 0
+      },
+      {
+        question: "Which step in the Information Extraction process is most crucial for distinguishing between identifying entities and extracting relationships?",
+        options: [
+          "Association",
+          "Segmentation",
+          "Classification",
+          "Clustering"
+        ],
+        answer: 0
+      },
+      {
+        question: "Which technique is best suited for performing Named Entity Recognition (NER) on a multilingual dataset?",
+        options: [
+          "Using SpaCy's xx_ent_wiki_sm pretrained model",
+          "Using sklearn's CountVectorizer with n-grams",
+          "Using KNN Classifier with cosine distance",
+          "Using SpaCy's en_core_web_sm model only",
+          "Using pandas read_json function with gzip compression"
+        ],
+        answer: 0
+      },
+      {
+        question: "How does a dead end differ from a spider trap in PageRank?",
+        options: [
+          "Dead ends have no outlinks, while spider traps have no outlinks to external pages.",
+          "Dead ends absorb all importance, while spider traps leak importance.",
+          "Dead ends violate column stochasticity, while spider traps preserve it.",
+          "Dead ends require teleports to fix, while spider traps are resolved by pruning.",
+          "Dead ends only occur in directed acyclic graphs, while spider traps require cycles."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the purpose of the damping factor (random teleportation) in PageRank?",
+        options: [
+          "It ensures convergence of PageRank values by preventing sinks and spider traps.",
+          "It directly increases the PageRank of pages with more outbound links.",
+          "It favors pages with fewer total links, making them easier to find.",
+          "It eliminates the iterative process, making computation faster.",
+          "It identifies irrelevant web pages and removes them from consideration."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following is NOT a standard step in common text pre-processing?",
+        options: [
+          "Automatically classifying documents into categories",
+          "Applying stemming to reduce words to their root form",
+          "Counting word frequencies and computing TF-IDF term weights",
+          "Removing stopwords from the text",
+          "Extracting words (terms) from raw text"
+        ],
+        answer: 0
+      },
+      {
+        question: "Which approach most closely aligns with using surrounding context for missing part-of-speech tags in a document?",
+        options: [
+          "Local Context",
+          "Manually Engineered Rules",
+          "Relation Extraction",
+          "Binary Relation Association",
+          "Binary Classification"
+        ],
+        answer: 0
+      },
+      {
+        question: "Why is term frequency (TF) sometimes normalized in the TF-IDF weighting scheme?",
+        options: [
+          "To prevent longer documents from having inflated term counts.",
+          "To adjust inverse document frequency scores for rare terms.",
+          "To remove punctuation and numbers from term vectors.",
+          "To reduce noise caused by stopwords.",
+          "To identify parts of speech in the document."
+        ],
+        answer: 0
+      },
+      {
+        question: "In PageRank, how is the importance of inlinks evaluated?",
+        options: [
+          "PageRank will weigh site1 higher if the source pages are more important",
+          "Site1 will always have a higher PageRank due to fewer links",
+          "Site2 will have a higher PageRank due to the quantity of inlinks",
+          "PageRank ignores the quality of the inlinks"
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the primary purpose of using the TF-IDF Term Weighting Scheme in the Vector Space Model?",
+        options: [
+          "To balance the importance of a term in a document with its rarity across the entire document collection.",
+          "To remove common stopwords from documents before indexing.",
+          "To directly calculate the similarity between a query and document using Boolean operators.",
+          "To compress document size by eliminating low-frequency terms.",
+          "To convert text documents into emojis for easier interpretation."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which page will likely have a higher PageRank if site1 has 10 inlinks from high-quality websites, and site2 has 120 from low-quality blogs?",
+        options: [
+          "PageRank will weigh site1 higher if the source pages are more important",
+          "Site1 will always have a higher PageRank due to fewer links",
+          "Site2 will have a higher PageRank due to the quantity of inlinks",
+          "PageRank ignores the quality of the inlinks"
+        ],
+        answer: 0
+      },
+      {
+        question: "Which task falls under the category of NLP 'Classification'?",
+        options: [
+          "Email spam filtering",
+          "Normalization",
+          "Segmentation",
+          "Web and corporate search",
+          "Knowledge base (KB) building"
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the primary reason for using random teleports in the PageRank algorithm?",
+        options: [
+          "It prevents rank sinks by allowing the random surfer to jump to any page, ensuring rank values do not get trapped in spider traps or dead ends.",
+          "It increases the probability of visiting high-authority websites more frequently.",
+          "It optimizes the computational efficiency of matrix multiplications in the PageRank calculation.",
+          "It removes the need for iterative convergence checks during PageRank computation.",
+          "It redistributes PageRank scores based on the content of web pages rather than link structure."
+        ],
+        answer: 0
+      },
+      {
+        question: "What are the key operations involved in preparing documents for search using an inverted index?",
+        options: [
+          "Tokenization, encryption, and compression.",
+          "Vocabulary search, results merging, and rank score computation.",
+          "Click-through rate optimization and ad matching.",
+          "Image recognition, video streaming, and speech synthesis.",
+          "Telepathy and instinct."
+        ],
+        answer: 0
+      },
+      {
+        question: "What can be done to help rank trustworthy news sources like BBC and NYTimes higher than clickbait websites in a news aggregator?",
+        options: [
+          "Use PageRank to assign higher scores to pages that are linked to by other important pages.",
+          "Count the number of images on each page and use this as the ranking metric.",
+          "Rank based on the number of words in the headline.",
+          "Just randomly shuffle the headlines to avoid bias.",
+          "Prefer newer articles regardless of content or links."
+        ],
+        answer: 0
+      },
+      {
+        question: "What role does the parameter β play in the Google Matrix formulation of PageRank?",
+        options: [
+          "It balances the influence of following links versus teleporting to a random page, typically set between 0.8 and 0.9.",
+          "It determines the number of iterations required for the algorithm to converge.",
+          "It adjusts the weight of inlinks based on the total number of pages in the web graph.",
+          "It ensures that the rank vector sums to zero after each iteration.",
+          "It eliminates the need for preprocessing the web graph to remove dead ends."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the correct NER tag sequence for the phrase 'Murdoch discusses future of News Corp in London'?",
+        options: [
+          "PER O O O ORG ORG O LOC",
+          "NNP VBG NN IN NNP NNP IN NNP",
+          "PER O O O ORG O O PER",
+          "NN VBG NN IN NN NN IN NN",
+          "PER O O O ORG ORG O O"
+        ],
+        answer: 0
+      },
+      {
+        question: "What are some basic stemming methods according to the Text Retrieval and Extraction lecture?",
+        options: [
+          "Using a set of rules to isolate the root of a word: removing the ending, transforming the word",
+          "Putting the words into an array and removing some at random",
+          "Creating a dictionary with all of the words in it, and remove the first 10",
+          "Merge the words together into one large word"
+        ],
+        answer: 0
+      },
+      {
+        question: "What problem does the PageRank algorithm encounter with 'dead-end' pages?",
+        options: [
+          "The random surfer gets stuck because there is nowhere to go from these pages.",
+          "The pages become too important because they have no outgoing links.",
+          "The algorithm fails to calculate scores for such pages.",
+          "Dead-ends do not affect the PageRank algorithm.",
+          "They automatically gain the highest scores."
+        ],
+        answer: 0
+      },
+      {
+        question: "What relation can be extracted from: 'Gerald, the national veterinarian chair, spoke with Rufus, the local veterinarian chair'?",
+        options: [
+          "Gerald is the national veterinarian chair.",
+          "Rufus is the national veterinarian chair.",
+          "Gerald is the local veterinarian chair.",
+          "Gerald isn't the national veterinarian chair."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following is an example of a two-hop query in a knowledge graph?",
+        options: [
+          "Which employees are supervised by the same manager as Employee X?",
+          "Find the birthdate of Person A.",
+          "Retrieve all people who live in the same city as Person B.",
+          "List all documents that reference Organization Y.",
+          "Which country does City Z belong to?"
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following statements best describes the matrix formulation used in the PageRank algorithm?",
+        options: [
+          "The value Mij​ equals 1/dj​ if page j links to page i, where dj is the number of outlinks from j.",
+          "Each element Mij​ represents a link from page i to page j, with rows summing to 1.",
+          "The matrix M is a symmetric matrix representing bidirectional web links.",
+          "The PageRank vector is computed as r=MTr, where M is an upper triangular matrix.",
+          "Each column in matrix M sums to 0, ensuring convergence of the PageRank vector."
+        ],
+        answer: 0
+      },
+      {
+        question: "Why is IOB encoding preferable over IO encoding in some NER tasks?",
+        options: [
+          "IOB encoding provides boundary information by indicating the beginning of entities, which helps distinguish adjacent entities of the same type.",
+          "IOB encoding reduces the number of entity labels required, making the model more computationally efficient.",
+          "IOB encoding eliminates the need for manual annotation by generating labels through unsupervised clustering.",
+          "IOB encoding ensures that every word is assigned a unique entity type, even if it does not belong to any named entity."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is Google's primary solution to address spider traps in the PageRank algorithm?",
+        options: [
+          "Introducing random teleports during the random walk.",
+          "Randomly assigning importance scores to trapped nodes.",
+          "Removing all internal links within spider traps.",
+          "Ignoring spider traps during PageRank calculation.",
+          "Setting spider trap PageRank values to zero."
+        ],
+        answer: 0
+      },
+     
+      {
+        question: "In the PageRank random walk model, what does the probability vector p(t) represent?",
+        options: [
+          "The probability vector p(t) represents the likelihood that a random surfer is on each page at time t.",
+          "A surfer always returns to the starting page after visiting one link.",
+          "The random walk process eventually terminates after a fixed number of steps.",
+          "The surfer chooses which link to follow based on page importance, not randomly.",
+          "The components of p(t) do not sum to 1, as they are not probabilities."
+        ],
+        answer: 0
+      },
+      {
+        question: "Why does the TF-IDF weighting scheme improve the effectiveness of vector space retrieval models?",
+        options: [
+          "It balances term frequency within a document and inverse document frequency across documents, giving more weight to informative, rare terms.",
+          "It strictly eliminates all stopwords before retrieval, ensuring only content-heavy words are used for document scoring.",
+          "It directly measures the semantic similarity of terms using deep learning embeddings.",
+          "It guarantees 100% recall by including all relevant documents in the results.",
+          "It ranks documents based on how aesthetically pleasing their formatting is."
+        ],
+        answer: 0
+      },
+      {
+        question: "When handling dead ends in the PageRank algorithm, which strategy is correct and widely used?",
+        options: [
+          "Follow random teleport links with probability 1.0 from dead-ends and adjust the matrix.",
+          "Completely remove dead-end nodes from the graph and never consider them again.",
+          "Increase the PageRank of dead-end nodes to artificially boost their visibility.",
+          "Ignore dead-ends entirely since they don't have outgoing links and can't affect the graph.",
+          "Automatically assign outgoing links to dead-end pages to simulate user behavior."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following statements is FALSE about why modern web search is considered a massive information retrieval (IR) system?",
+        options: [
+          "Web search needs to analyze its vast data sources and index only verified academic articles and excludes commercial or user-generated content to maintain a uniform dataset.",
+          "Web search requires the implementation of distributed architectures that support parallel crawling, indexing, and searching of vast online contents",
+          "Web Search servers use large inverted indexes and other databases to organize vast amounts of crawled content.",
+          "Web Search engines use advanced ranking algorithms, incorporate link analysis, metadata, and user behavior signals to improve relevance.",
+          "At query (search) time, search engines have to conduct different types of fast and efficient vector query matching to ensure fast real time responses to user."
+        ],
+        answer: 0
+      },
+      {
+        question: "In the context of knowledge graph mining, which query would most likely require reasoning over multiple hops?",
+        options: [
+          "Identifying all known collaborators of a particular scientist.",
+          "Querying the location of a single entity, such as a specific company or country.",
+          "Determining the headquarters location of a company based on publicly available data.",
+          "Extracting a list of all books written by an author."
+        ],
+        answer: 0
+      },
+      {
+        question: "Why do spider traps cause problems in the PageRank algorithm, and how is it solved?",
+        options: [
+          "Spider traps trap the random surfer in a loop, and random teleports allow the surfer to escape.",
+          "Spider traps increase the number of dead ends, and removing them simplifies the link matrix.",
+          "Spider traps make the PageRank scores equal across all nodes, which is resolved by pruning them.",
+          "Spider traps block access to the most important pages, and the algorithm removes those pages entirely.",
+          "Spider traps are caused by duplicate web pages, and PageRank filters them out during matrix normalization."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following is true regarding boundary errors in named entity recognition (NER)?",
+        options: [
+          "Selecting an incorrect span like 'Bank of Chicago' instead of 'First Bank of Chicago' can result in both a false positive and a false negative.",
+          "Precision and recall are unaffected by boundary errors and are straightforward to calculate in IE/NER.",
+          "Boundary errors in IE/NER only affect recall but not precision.",
+          "IE/NER evaluation always gives full credit for partial matches to entities.",
+          "Selecting no entity at all is always worse than selecting a partial one."
+        ],
+        answer: 0
+      },
+      {
+        question: "Why is cosine similarity used in the Vector Space Model to rank document relevance to a query?",
+        options: [
+          "Because it measures the angle between document and query vectors, allowing relevance to be assessed independently of document length.",
+          "Because it directly counts how many times each query word appears in the document without normalization.",
+          "Because it computes the maximum term frequency across all documents to identify the most common document.",
+          "Because it measures the difference in page rank scores between two documents to rank them.",
+          "Because it ensures that stopwords and stemming are completely ignored during ranking."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the primary role of representing documents and queries as vectors in the Vector Space Model?",
+        options: [
+          "To measure the similarity between documents and queries using mathematical operations like cosine similarity",
+          "To visualize documents in a two-dimensional plot",
+          "To compress documents for efficient storage",
+          "To eliminate the need for tokenization and preprocessing",
+          "To ensure that documents have a fixed number of words"
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following statements is NOT true?",
+        options: [
+          "PageRank's random teleport component uses a probability parameter β typically between 0.2–0.3.",
+          "The Vector Space Model measures document relevance using cosine similarity between term vectors.",
+          "Inverted indexes allow constant-time lookup for documents containing specific terms.",
+          "TF-IDF weighting assigns higher scores to terms that are frequent in a document but rare in the collection.",
+          "Random teleports in PageRank prevent spider traps by allowing periodic jumps to random pages."
+        ],
+        answer: 0
+      },
+      {
+        question: "According to the lecture slides from GraphAnalysis.pdf and the Bowtie Model of the Web, what best describes the Strongly Connected Component (SCC) and its relationship to the rest of the web’s structure?",
+        options: [
+          "The SCC is the core of the web where every page can reach every other through directed links, distinguishing it from tendrils and tubes which do not connect fully to this core.",
+          "The SCC consists only of web pages that cannot be accessed by any other part of the web, making it entirely disconnected from the rest of the structure.",
+          "The SCC includes only the longest hyperlinks that connect the web’s deepest nodes, forming the most remote part of the web.",
+          "The SCC is a random sampling of isolated pages selected through PageRank, rather than link structure.",
+          "The SCC is the part of the web where spiders nest and spin actual bows and ties."
+        ],
+        answer: 0
+      },
+      {
+        question: "According to slides 18-19 from Dr. Grant's lecture on Graph Analysis, which of the following statements on spider traps is true when in respect to the Page Rank Algorithm?",
+        options: [
+          "Spider traps happens when there are pages linked together with none of them linking to pages outside the group.",
+          "Spider traps serves the purpose of acting as a test for the surfer to make sure the scores are as accurate as possible.",
+          "Spider traps are pages with an extremely large number of links leading to them, acting as a central hub.",
+          "Spider traps are considered pages with no links leading to them, making them isolated.",
+          "Spider traps are pages with too many inbound links, leading to the surfer becoming poisoned and crashing."
+        ],
+        answer: 0
+      },
+      {
+        question: "According to lecture on Text Retrieval and Extraction.pdf, which of the following is NOT a typical Name Entity Recognition (NER) tag?",
+        options: [
+          "Adjective",
+          "Person",
+          "Location",
+          "Organization",
+          "Date"
+        ],
+        answer: 0
+      },
+      {
+        question: "According to slide 16 from our lecture, 'Text Retrieval and Extraction,' which of the following statements is true regarding the IDF (Inverse Document Frequency) component of TF-IDF weighting?",
+        options: [
+          "It reduces the weight of terms that appear frequently across the document collection.",
+          "It increases the weight of terms that appear frequently in many documents.",
+          "It normalizes term frequencies within a single document.",
+          "It directly measures the cosine similarity between documents.",
+          "It removes all common words from the dataset."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following sentences would most likely confuse a Named Entity Recognition (NER) system due to coreference and ambiguous entity boundaries?",
+        options: [
+          "After discussing with Jordan, she emailed the documents to her boss.",
+          "The decision of Apple’s CEO was widely debated in tech circles.",
+          "Tesla opened a new Gigafactory in Berlin, expanding its European operations.",
+          "Microsoft’s new product launch was covered by all major news channels.",
+          "Amazon recently acquired a startup based in San Francisco."
+        ],
+        answer: 0
+      },
+      {
+        question: "According to the 'Text Retrieval and Extraction' slide 16, which of the following is NOT TRUE about why we need to remove stopwords?",
+        options: [
+          "Increases indexing (or data) file size.",
+          "Boost productivity and efficacy.",
+          "Ineffective for text mining or searching.",
+          "The retrieval system is confused by them.",
+          "Reduces the size of the indexing (or data) file."
+        ],
+        answer: 0
+      },
+      {
+        question: "According to the Text Retrieval and Extraction lecture (Slide 32), Information Extraction is defined as which combination of processes?",
+        options: [
+          "Segmentation, Classification, Association, and Clustering.",
+          "Segmentation, Classification, Association, and Aggregation.",
+          "Tokenization, Prediction, Association, and Clustering.",
+          "Segmentation, Translation, Association, and Clustering.",
+          "Parsing, Classification, Matching, and Clustering."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following query examples would produce poor retrieval results when using the Boolean Model, due to lack of term frequency consideration?",
+        options: [
+          "(\"Artificial Intelligence\" AND \"Machine Learning\") AND (NOT \"Supervised\")",
+          "(\"Deep\" OR \"Learning\") AND (\"Neural\" OR \"Networks\")",
+          "((“Data” AND “Science”) AND (“Analysis” OR “Visualization”))",
+          "“COVID-19” AND “Vaccination” AND “Symptoms”",
+          "“Python” AND “Programming” AND (“Web” OR “Scraping”)"
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following sentences would make the task of Named Entity Recognition quite difficult?",
+        options: [
+          "I had a great time visited Jordan last year.",
+          "Amy had a sandwich for lunch yesterday.",
+          "Dr. Eleanor Vance presented her research at the University of Florida.",
+          "The Eiffel Tower is a famous landmark in Paris, France.",
+          "Bill Gates debated the economic philosophy of open-source software with Orwellian fervor."
+        ],
+        answer: 0
+      },
+      {
+        question: "While designing a recommendation system based on user click patterns, what is the best way to ensure stable and fair PageRank scores?",
+        options: [
+          "Introduce random teleportation with damping factor β and modify the transition matrix to ensure it remains stochastic.",
+          "Remove all spider trap pages and dead-end pages entirely to avoid score leakage.",
+          "Use raw inlink counts and avoid any recursive formulation to simplify calculations.",
+          "Assign zero score to dead ends and re-normalize scores across the rest of the network.",
+          "Force every page to link to all others to artificially satisfy strong connectivity assumptions."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following best describes the relationship between precision and recall in information retrieval?",
+        options: [
+          "Precision measures the proportion of retrieved documents that are relevant, while recall measures how many of the relevant documents were successfully retrieved.",
+          "Precision measures how many of the relevant documents were successfully retrieved, while recall measures the proportion of retrieved documents that are relevant.",
+          "Precision and recall both measure only the quantity of documents retrieved, ignoring their relevance.",
+          "A higher precision score always implies a higher recall score, and vice versa.",
+          "Neither precision nor recall can be used to evaluate a retrieval system meaningfully."
+        ],
+        answer: 0
+      },
+      {
+        question: "How are new facts inferred from a knowledge graph using rule-based reasoning?",
+        options: [
+          "By applying logical rules over known relationships to derive new entity connections, such as inferring BornIn(Person, Country) from BornIn(Person, City) and LocateIn(City, Country).",
+          "By identifying web pages with the highest PageRank scores and labeling them as the most authoritative sources for new knowledge.",
+          "By randomly selecting facts with low frequency and assigning them high confidence based on inverse document frequency.",
+          "By deleting conflicting triples in the graph until only the most frequent entity relations remain.",
+          "By using deep neural networks to replace all logical rules and manually curated relationships with black-box predictions."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following statements accurately describes the stochastic adjacency matrix M used in PageRank?",
+        options: [
+          "The entry Mij equals 1/dj if page j links to page i, and 0 otherwise, where dj is the number of outlinks from page j.",
+          "The entry Mij equals 1/dj if page i links to page j, and 0 otherwise, where dj is the number of outlinks from page i.",
+          "The entry Mij equals the total number of links between page i and page j.",
+          "The entry Mij equals 1 if page j links to page i, and 0 otherwise, regardless of the number of outlinks.",
+          "The entry Mij represents the probability that a user on page i will directly navigate to page j without clicking any links."
+        ],
+        answer: 0
+      },
+      {
+        question: "Why is precision generally considered a more reliable evaluation metric than recall in the context of web search engines?",
+        options: [
+          "Because users tend to be more interested in seeing a few relevant results at the top rather than all relevant documents available.",
+          "Because web crawlers can accurately determine the total number of relevant documents for any query.",
+          "Because search engines rarely return more than 10 documents per query, making recall obsolete.",
+          "Because recall directly measures the relevance of the top results displayed to the user.",
+          "Because precision penalizes documents with high TF-IDF scores."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following best explains the purpose of word shape features in a sequence labeling task such as Named Entity Recognition (NER)?",
+        options: [
+          "They encode properties like capitalization, digits, and punctuation to help the model generalize across similarly structured words.",
+          "They are used to determine semantic categories by consulting external resources like WordNet.",
+          "They map input words to learned word embeddings from large-scale corpora.",
+          "They are used to convert raw text into TF-IDF vectors for use in similarity comparisons.",
+          "They track repeated references to the same entity throughout a document using coreference resolution."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following is NOT true of knowledge bases?",
+        options: [
+          "A knowledge base is an unstructured collection of facts and data adhering to different data models.",
+          "A knowledge base is used by machines to understand human information in a principled manner.",
+          "A knowledge base can be used to improve search engines.",
+          "A knowledge base is a collection facts, relationships, and entities that follow the same structured data model.",
+          "Google Knowledge Graph is an example of a knowledge base."
+        ],
+        answer: 0
+      },
+      {
+        question: "Let's say a term appears 3 times in a document of 100 words. What is the term frequency (TF)?",
+        options: [
+          "0.03",
+          "3",
+          "33.3",
+          "0.3"
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the primary purpose of using a stochastic adjacency matrix M in the PageRank algorithm?",
+        options: [
+          "To represent the probability of transitioning from one page to another based on outlinks, with columns summing to 1.",
+          "To ensure that every page has an equal number of inlinks and outlinks.",
+          "To eliminate dead ends by redistributing their importance scores evenly across all pages.",
+          "To rank pages based solely on their content rather than their link structure.",
+          "To calculate the shortest path between any two pages in the web graph."
+        ],
+        answer: 0
+      },
+      {
+        question: "Why is the sparsest cut often preferred over the minimum cut for graph clustering, despite its computational difficulty?",
+        options: [
+          "The sparsest cut balances the number of edges crossing the partitions while maintaining well-connected clusters.",
+          "The sparsest cut is always computationally efficient and can be solved in polynomial time.",
+          "The sparsest cut ensures that every vertex in a cluster has exactly the same degree.",
+          "The sparsest cut guarantees that each partition contains an equal number of vertices.",
+          "The sparsest cut is equivalent to the modularity-based clustering approach."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the primary mathematical condition that ensures convergence of the power iteration method used in computing PageRank?",
+        options: [
+          "The transition matrix must be column stochastic and aperiodic with all positive entries.",
+          "The web graph must be fully connected and contain no cycles.",
+          "Each node must have exactly one incoming and one outgoing link.",
+          "The PageRank must be computed on the adjacency matrix without teleportation.",
+          "The teleportation parameter must be set to exactly 0.5 to guarantee convergence."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following statements is INCORRECT about random teleports in PageRank?",
+        options: [
+          "Random teleports were implemented primarily to improve computational efficiency of the algorithm.",
+          "Without random teleports, spider traps would absorb all importance scores over time.",
+          "The typical value of β (probability of following a link) is between 0.8 and 0.9.",
+          "Random teleports make the matrix column stochastic when dealing with dead ends.",
+          "Random teleports ensure the surfer will escape spider traps within a few steps."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following statement is INCORRECT about web search as Information Retrieval?",
+        options: [
+          "Precision and Recall can give accurate measurements in websearch.",
+          "Web crawler needs to crowl the web for each query (even though it's repetative query)",
+          "Servers established a huge inverted indexing database for collected web pages",
+          "At query (search) time, search engines conduct different types of vector query matching.",
+          "None of the above"
+        ],
+        answer: 0
+      },
+      {
+        question: "What condition defines a stationary distribution in the context of a random walk on a web graph?",
+        options: [
+          "When the probability vector p(t) no longer changes after matrix multiplication, i.e., p(t + 1) = Mp(t) = p(t).",
+          "When every page in the web graph has exactly one outgoing link.",
+          "When the number of pages visited by the surfer reaches a fixed number.",
+          "When each column of the matrix is sorted in decreasing order.",
+          "When the teleportation rate B (Beta) is set to 0.5."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the primary goal of Information Extraction systems?",
+        options: [
+          "To find and understand limited parts of texts and produce a structured representation of relevant information such as entities and relations.",
+          "To retrieve a ranked list of documents that are relevant to a search query.",
+          "To classify the overall topic of a given document.",
+          "To perform basic text processing steps like tokenization, stemming, and removal of stop words.",
+          "To evaluate the performance of a search engine based on measures like precision and recall."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following best describes the recursive formulation of the PageRank algorithm?",
+        options: [
+          "Each page’s importance is determined by summing the contributions (votes) from all pages that link to it, where each vote is the linking page’s score divided by its number of outlinks.",
+          "Each page’s score is calculated solely by the number of incoming links without considering the source page’s quality.",
+          "The page importance is assigned randomly and then adjusted through iterative averaging regardless of the link structure.",
+          "Every page receives the same constant score regardless of the connectivity among pages."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following is an example of a mapping that is likely to be produced by named entity recognition (NER)?",
+        options: [
+          "George Washington → person",
+          "WD-40 → XX-dd",
+          "brilliant → adjective",
+          "krill → appears in documents 0, 4, and 19",
+          "running → run"
+        ],
+        answer: 0
+      },
+      {
+        question: "What does the stationary distribution represent in the context of the PageRank algorithm?",
+        options: [
+          "The long-term probability that a random surfer is on a particular page.",
+          "The total number of inlinks to a webpage.",
+          "The minimum number of clicks required to reach a page.",
+          "The number of pages a user visits before closing their browser."
+        ],
+        answer: 0
+      },
+      {
+        question: "Why do dead ends in the web graph cause issues in PageRank computation?",
+        options: [
+          "They cause the importance score to 'leak out' and reduce the total rank.",
+          "They generate fake backlinks and mislead the algorithm.",
+          "They slow down internet speeds globally.",
+          "They reduce the number of search engine ads.",
+          "They introduce negative eigenvalues into the link matrix, destabilizing convergence."
+        ],
+        answer: 0
+      },
+      {
+        question: "What critical problem does the PageRank algorithm solve through the use of random teleports?",
+        options: [
+          "It addresses both spider traps and dead ends by preventing the accumulation of importance in traps and maintaining a stochastic matrix for dead ends.",
+          "It only solves the problem of spider traps by allowing surfers to escape highly connected trap components.",
+          "It exclusively addresses dead ends by creating a complete strongly connected graph.",
+          "It increases the computational efficiency of the algorithm without affecting the ranking results.",
+          "It prevents websites from artificially increasing their ranking by creating circular references to themselves."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the key difference between IO and IOB encoding schemes in sequence labelling?",
+        options: [
+          "IOB adds a Beginning tag to differentiate the start of entities, which IO does not.",
+          "IO encoding can capture nested entities, while IOB cannot.",
+          "IO encoding is used exclusively in POS tagging, and IOB in sentiment analysis.",
+          "IO requires an additional End tag which is not present in IOB.",
+          "IO and IOB are the same, the only difference is in the implementation."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following best describes the benefit of using regular expressions in low-level information extraction systems?",
+        options: [
+          "They offer a simple and efficient way to extract specific patterns such as phone numbers, dates, or HTML tags from semi-structured or unstructured text.",
+          "They are primarily used to compute TF-IDF weights for named entities across documents.",
+          "They enable automated query expansion techniques based on real-time user feedback in search engines.",
+          "They completely replace the need for advanced sequence labeling models like CRFs or LSTMs.",
+          "They determine the grammatical or semantic roles (e.g., subject, predicate) of all tokens in a document."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the primary role of the Inverted Index in a search engine system?",
+        options: [
+          "It maps terms to the list of documents where they appear, enabling efficient full-text search.",
+          "It stores the full content of each document in a compressed format for retrieval.",
+          "It ranks documents based on PageRank scores before user queries are processed.",
+          "It detects named entities in documents and links them to a knowledge base.",
+          "It evaluates term frequency-inverse document frequency (TF-IDF) weights for all documents."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following steps specifically weights terms according to their frequency in a document relative to their frequency across all documents?",
+        options: [
+          "Frequency counts and computing TF-IDF term weights",
+          "Stopwords removal",
+          "Stemming",
+          "Word (term) extraction: easy",
+          "Converting all text to lowercase"
+        ],
+        answer: 0
+      },
+      {
+        question: "In the random surfer model, what does teleportation (1 - Beta) represent?",
+        options: [
+          "The chance of jumping randomly to a page, ignoring existing links",
+          "A restart that leads to a page visited earlier in the session",
+          "The certainty of choosing the most popular page",
+          "A measure of links on a page divided by in-link weight",
+          "The chance of landing on a page used for advertisements"
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the proper order of steps in training a Machine Learning sequence model for Named Entity Recognition (NER)?",
+        options: [
+          "Collect training documents → Label tokens with entity classes → Design feature extractors → Train sequence classifier",
+          "Label tokens with entity classes → Collect training documents → Design feature extractors → Train sequence classifier",
+          "Collect training documents → Run sequence model inference → Label tokens with entity classes → Train sequence classifier",
+          "Design feature extractors → Collect training documents → Label tokens with entity classes → Train sequence classifier",
+          "Collect training documents → Label tokens with entity classes → Train sequence classifier → Design feature extractors"
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following is a model-based approach for searching?",
+        options: [
+          "K-Nearest Neighbors (KNN)",
+          "Pairwise Distances",
+          "SpaCy NLP",
+          "TF-IDF Vectorization",
+          "Random Forests"
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the primary purpose of introducing the teleportation mechanism in the PageRank algorithm?",
+        options: [
+          "To prevent the random surfer from getting stuck in spider traps and dead-ends by allowing a jump to any page with a certain probability.",
+          "To ensure that every web page receives an equal PageRank score by distributing the rank uniformly.",
+          "To simulate the behavior of users who always follow links without ever jumping to random pages.",
+          "To prioritize pages with the highest number of outgoing links, assuming they are the most important.",
+          "To eliminate the influence of pages with no incoming links by assigning them a PageRank of zero."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the relationship between Inverse Document Frequency (IDF) and document collection size in TF-IDF?",
+        options: [
+          "Terms that appear in a higher percentage of documents in the collection will have lower IDF values, reducing their influence in document retrieval.",
+          "IDF values are calculated without considering the total number of documents in the collection.",
+          "IDF increases the weight of common words that appear in many documents across the corpus",
+          "IDF values remain constant regardless of how many documents contain a particular term.",
+          "IDF is primarily used to normalize term counts by document length rather than document frequency."
+        ],
+        answer: 0
+      },
+      {
+        question: "According to slide Graph Analysis, what is the core idea behind how PageRank computes the importance of a web page?",
+        options: [
+          "A page's importance is determined by the sum of the importance scores of all its inlinking pages, each divided by their number of outlinks.",
+          "A page is important if it has many outlinks pointing to other pages.",
+          "A page’s rank is calculated by how many clicks it gets from users in a search engine.",
+          "Every page receives the same initial score, and the final score is based only on its number of inlinks.",
+          "A page with no inlinks always has the highest PageRank because it has no competition."
+        ],
+        answer: 0
+      },
+      {
+        question: "According to lecture (Text Retrieval and Extraction, Day 3), why is the inverse document frequency (IDF) used in TF-IDF weighting?",
+        options: [
+          "To increase the weight of common words across documents",
+          "To reduce the influence of stopwords",
+          "To normalize word count by document length",
+          "To assign more weight to frequently occurring terms",
+          "To remove punctuation and symbols from the index"
+        ],
+        answer: 1
+      },
+      {
+        question: "When evaluating the performance of an Information Retrieval system, which metric focuses on the proportion of retrieved documents that are actually relevant?",
+        options: [
+          "Precision, as it measures the proportion of retrieved documents that are relevant.",
+          "Recall, as it measures the proportion of all relevant documents in the collection that were retrieved.",
+          "F1-score, as it is the harmonic mean of precision and recall.",
+          "Accuracy, as it measures the overall correctness of the system's retrieval."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the primary purpose of using an inverted index in text retrieval systems?",
+        options: [
+          "To efficiently map each term to the list of documents in which it occurs, enabling fast query processing.",
+          "To arrange documents in alphabetical order for easier lookup by title.",
+          "To compress text data and reduce storage requirements.",
+          "To track the sequence in which users access documents during search sessions.",
+          "To rank documents by their publication date for recency-based retrieval."
+        ],
+        answer: 0
+      },
+      {
+        question: "You're building a search engine for legal documents. After applying TF-IDF, common terms like 'plaintiff' dominate. What adjustment helps retrieval precision?",
+        options: [
+          "Apply Inverse Document Frequency to reduce the influence of ubiquitous legal terms and enhance document differentiation.",
+          "Remove all legal-specific terms from the corpus to prevent overfitting.",
+          "Replace TF-IDF with raw term frequency.",
+          "Increase the weight of query terms using one-hot encoding.",
+          "Install a legal dictionary plugin to translate terms into simpler language."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which text processing technique reduces word variations like 'users' to 'use' and improves recall?",
+        options: [
+          "Stemming",
+          "Stopword Removal",
+          "TF-IDF Weighting",
+          "POS Tagging",
+          "Named Entity Recognition"
+        ],
+        answer: 0
+      },
+      {
+        question: "When developing a system to extract company-location relationships from news, what is the best approach?",
+        options: [
+          "Using TF-IDF, IOB encoding for NER, and relation extraction patterns.",
+          "Removing stopwords, applying stemming, and using Boolean retrieval.",
+          "Creating an inverted index and using regular expressions.",
+          "Using word shape features and PageRank for relationship importance.",
+          "Cosine similarity, coreference resolution, and binary classification without sequence information."
+        ],
+        answer: 0
+      },
+      {
+        question: "Why is the TF-IDF weighting scheme preferred over raw term frequency when computing document relevance?",
+        options: [
+          "TF-IDF increases the weight of commonly occurring terms across documents.",
+          "TF-IDF reduces the weight of terms that appear in many documents, highlighting more distinctive terms.",
+          "TF-IDF eliminates the need for cosine similarity.",
+          "TF-IDF ensures that stopwords are always assigned the highest weight.",
+          "TF-IDF computes term importance based only on the document's length."
+        ],
+        answer: 1
+      },
+      {
+        question: "What is a benefit of stemming in text retrieval?",
+        options: [
+          "It reduces indexing size by a substantial amount.",
+          "It decreases the effectiveness of information retrieval.",
+          "It does not improve recall.",
+          "It would be used to reduce like and line because they share many letters.",
+          "It does not help match similar words."
+        ],
+        answer: 0
+      },
+      {
+        question: "In the IR architecture, what component processes the user's query before it's sent to the retrieval system?",
+        options: [
+          "Query Operations",
+          "User Feedback",
+          "Document Collection",
+          "Document Index",
+          "Indexer"
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following is NOT a use or application of Named Entity Recognition (NER)?",
+        options: [
+          "Detecting parts of speech in a sentence",
+          "Indexing and linking named entities",
+          "Assigning sentiment to companies or products",
+          "Answering questions using named entities"
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the primary task of Named Entity Recognition (NER)?",
+        options: [
+          "To identify and classify entities such as people, locations, and organizations in a text.",
+          "To compute the sentiment of product reviews.",
+          "To remove punctuation and digits from a dataset.",
+          "To cluster similar documents based on keywords.",
+          "To extract links and hyperlinks from web documents."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following best captures the relationship between proteins CBF-A, CBF-B, and CBF-C?",
+        options: [
+          "CBF-A and CBF-C interact to form a complex, while CBF-B associates with the complex.",
+          "CBF-B interacts directly with CBF-A and CBF-C.",
+          "All three proteins interact with each other equally.",
+          "CBF-B and CBF-C interact and form a protein complex.",
+          "CBF-A interacts only with CBF-B but not with CBF-C."
+        ],
+        answer: 0
+      },
+      {
+        question: "Which of the following is NOT a key step in training a machine learning-based Named Entity Recognition (NER) system?",
+        options: [
+          "Manually tagging entities in the test set during evaluation.",
+          "Collecting a set of representative training documents.",
+          "Labeling each token for its entity class or other (O).",
+          "Designing feature extractors appropriate to the text and classes.",
+          "Training a sequence classifier to predict the labels from the data."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the primary role of an inverted index in supporting efficient document retrieval?",
+        options: [
+          "It maps each term in the vocabulary to a list of documents in which the term appears, allowing for fast lookup of matching documents for a given query.",
+          "It compresses the entire document collection into a single vector space.",
+          "It maintains a binary matrix for document classification tasks.",
+          "It stores the frequency of every word in a document for IOB tagging.",
+          "It parses queries using rule-based natural language understanding systems."
+        ],
+        answer: 0
+      },
+      {
+        question: "How does the TF-IDF weighting scheme enhance retrieval performance in the vector space model?",
+        options: [
+          "By combining normalized term frequency with a logarithmically scaled IDF, boosting rare and important terms.",
+          "TF-IDF assigns lower weights to rare terms and boosts frequent terms.",
+          "TF-IDF transforms documents into binary feature vectors for Boolean-style retrieval.",
+          "TF-IDF eliminates all stopwords and performs stemming.",
+          "TF-IDF relies solely on inverse document frequency to rank terms."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the main reason for removing stopwords during text preprocessing?",
+        options: [
+          "Stopwords are common words that usually carry little meaningful information for tasks like retrieval or classification.",
+          "Stopwords are rare words that add significant semantic value.",
+          "Stopwords always change the meaning of a sentence, so they must be removed.",
+          "Removing stopwords increases the length of the document vector.",
+          "Stopwords are only used in numeric feature extraction."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is the main purpose of IOB encoding in sequence labeling tasks like NER?",
+        options: [
+          "It helps differentiate between the beginning and continuation of named entities, improving the accuracy of entity boundary detection.",
+          "It identifies parts of speech like nouns and verbs.",
+          "It clusters documents based on shared entities using cosine similarity.",
+          "It is used to extract relations between entities by using logical rule chaining.",
+          "It transforms raw documents into bag-of-words vectors."
+        ],
+        answer: 0
+      },
+      {
+        question: "What distinguishes Information Extraction (IE) from Information Retrieval (IR)?",
+        options: [
+          "IE aims to produce a structured representation of specific information from text, whereas IR focuses on retrieving relevant documents in response to a query",
+          "IE primarily uses statistical models like TF-IDF, while IR relies more on rule-based systems.",
+          "IE is used for web search, while IR is used for extracting from medical literature.",
+          "IE focuses on tokenization and stemming, IR deals with sentiment analysis.",
+          "IE uses precision/recall at document level, IR uses F1 score per entity."
+        ],
+        answer: 0
+      },
+      {
+        question: "What is a key difference in how the Boolean model and Vector Space Model represent documents and queries in IR?",
+        options: [
+          "The Vector Space Model considers the frequency of terms within documents and across the collection, whereas the Boolean model primarily focuses on the presence or absence of terms.",
+          "The Boolean model represents documents as vectors with weighted terms.",
+          "The Boolean model uses cosine similarity, the Vector Space Model uses logical match.",
+          "The Boolean model supports natural language, Vector Space requires Boolean operators.",
+          "Both use bags of words, but Boolean considers term order."
+        ],
+        answer: 0
+      },
+      {
+        question: "According to the lecture and 'Text Retrieval and Extraction.pdf', what is the primary purpose of the Inverse Document Frequency (IDF) component in the TF-IDF term weighting scheme?",
+        options: [
+          "To reduce the weight of terms that appear in many documents in the collection",
+          "To increase the weight of terms based on their frequency within a specific document",
+          "To normalize the term frequency by dividing it by the total number of terms in a document",
+          "To identify and remove common words like 'the', 'of', and 'and' from the document",
+          "To determine the cosine similarity between a document vector and a query vector"
+        ],
+        answer: 0
+      },
+      {
+        question: "In the information retrieval lecture, which of the following best describes how retrieval works in the Vector Space Model?",
+        options: [
+          "The relevance of a document to a query is measured using cosine similarity between their vector representations.",
+          "A document is considered relevant only if it contains all query terms using Boolean logic.",
+          "The retrieval is based on the frequency of stopwords in the document.",
+          "Documents are ranked by the number of hyperlinks they contain.",
+          "Each document is compared using edit distance between the text strings."
+        ],
+        answer: 0
+      }
+    ];
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function shuffleQuestions() {
+      currentQuestions = shuffle([...allQuestions]);
+      initQuiz();
+    }
+
+    function noShuffle() {
+      currentQuestions = [...allQuestions];
+      initQuiz();
+    }
+
+    function initQuiz() {
+      answers = new Array(currentQuestions.length).fill(null);
+      score = 0;
+      currentPage = 0;
+      totalPages = Math.ceil(currentQuestions.length / questionsPerPage);
+      loadPage();
+    }
+
+    function loadPage() {
+      const start = currentPage * questionsPerPage;
+      const end = Math.min(start + questionsPerPage, currentQuestions.length);
+      const pageQuestions = currentQuestions.slice(start, end);
+      const questionsDiv = document.getElementById('questions');
+      questionsDiv.innerHTML = '';
+
+      pageQuestions.forEach((q, index) => {
+        const qIndex = start + index;
+        const div = document.createElement('div');
+        div.className = 'question';
+        div.innerHTML = `<h3>${qIndex + 1}. ${q.question}</h3>`;
+        const optionsDiv = document.createElement('div');
+        optionsDiv.className = 'options';
+
+        q.options.forEach((value, optIndex) => {
+          const optDiv = document.createElement('div');
+          optDiv.className = 'option';
+          optDiv.textContent = value;
+
+          if (answers[qIndex] !== null) {
+            if (optIndex === q.answer) {
+              optDiv.classList.add('selected', 'correct');
+            } else if (optIndex === answers[qIndex]) {
+              optDiv.classList.add('selected', 'incorrect');
+            }
+            optDiv.style.cursor = 'default';
+          } else {
+            optDiv.onclick = () => selectAnswer(qIndex, optIndex, q.answer);
+          }
+
+          optionsDiv.appendChild(optDiv);
+        });
+
+        div.appendChild(optionsDiv);
+        questionsDiv.appendChild(div);
+      });
+
+      document.getElementById('prevBtn').disabled = currentPage === 0;
+      document.getElementById('nextBtn').textContent = currentPage === totalPages - 1 ? 'Finish' : 'Next';
+      document.getElementById('score').textContent = `Score: ${score} / ${currentQuestions.length}`;
+    }
+
+    function selectAnswer(qIndex, selectedIndex, correctIndex) {
+      if (answers[qIndex] !== null) return;
+      answers[qIndex] = selectedIndex;
+      if (selectedIndex === correctIndex) score++;
+      loadPage();
+    }
+
+    function nextPage() {
+      if (currentPage < totalPages - 1) {
+        currentPage++;
+        loadPage();
+      } else {
+        alert(`Quiz Completed! Final Score: ${score} / ${currentQuestions.length}`);
+      }
+    }
+
+    function prevPage() {
+      if (currentPage > 0) {
+        currentPage--;
+        loadPage();
+      }
+    }
+
+    window.onload = () => {
+      noShuffle(); // or shuffleQuestions();
+    };
+  </script>
+</body>
+</html>
