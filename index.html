@@ -140,19 +140,18 @@
       <button class="nav-btn" id="nextBtn" onclick="nextPage()">Next</button>
     </div>
   </div>
+<script>
+  let questions = [];
+  let currentPage = 0;
+  let score = 0;
+  const questionsPerPage = 20;
+  let totalPages = 0;
+  let answers = [];
+  let currentQuestions = [];
 
-  <script>
-    let questions = [];
-    let currentPage = 0;
-    let score = 0;
-    const questionsPerPage = 20;
-    let totalPages = 0;
-    let answers = [];
-    let currentQuestions = [];
-
-    // Sample: Replace with your full questions list
-    const allQuestions = [
-    {
+  // Your full question list here (same structure)
+  const allQuestions = [
+     {
         question: "Which of the following best describes a key limitation of the Boolean model in Information Retrieval?",
         options: [
           "It retrieves documents that logically satisfy the query but does not consider how often terms appear.",
@@ -1240,103 +1239,122 @@
         ],
         answer: 0
       }
-    ];
+    
+  ];
 
-    function shuffle(array) {
-      for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-      }
-      return array;
+  function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
     }
+    return array;
+  }
 
-    function shuffleQuestions() {
-      currentQuestions = shuffle([...allQuestions]);
-      initQuiz();
-    }
+  function shuffleOptionsInQuestions(questionsList) {
+    return questionsList.map(q => {
+      const originalAnswer = q.options[q.answer];
+      const shuffledOptions = shuffleArray([...q.options]);
+      const newAnswerIndex = shuffledOptions.indexOf(originalAnswer);
+      return {
+        ...q,
+        options: shuffledOptions,
+        answer: newAnswerIndex
+      };
+    });
+  }
 
-    function noShuffle() {
-      currentQuestions = [...allQuestions];
-      initQuiz();
-    }
+  function shuffleQuestions() {
+    currentQuestions = shuffleOptionsInQuestions(shuffleArray([...allQuestions]));
+    initQuiz();
+  }
 
-    function initQuiz() {
-      answers = new Array(currentQuestions.length).fill(null);
-      score = 0;
-      currentPage = 0;
-      totalPages = Math.ceil(currentQuestions.length / questionsPerPage);
-      loadPage();
-    }
+  function noShuffle() {
+    currentQuestions = shuffleOptionsInQuestions([...allQuestions]);
+    initQuiz();
+  }
 
-    function loadPage() {
-      const start = currentPage * questionsPerPage;
-      const end = Math.min(start + questionsPerPage, currentQuestions.length);
-      const pageQuestions = currentQuestions.slice(start, end);
-      const questionsDiv = document.getElementById('questions');
-      questionsDiv.innerHTML = '';
+  function initQuiz() {
+    answers = new Array(currentQuestions.length).fill(null);
+    score = 0;
+    currentPage = 0;
+    totalPages = Math.ceil(currentQuestions.length / questionsPerPage);
+    loadPage();
+  }
 
-      pageQuestions.forEach((q, index) => {
-        const qIndex = start + index;
-        const div = document.createElement('div');
-        div.className = 'question';
-        div.innerHTML = `<h3>${qIndex + 1}. ${q.question}</h3>`;
-        const optionsDiv = document.createElement('div');
-        optionsDiv.className = 'options';
+  function loadPage() {
+    const start = currentPage * questionsPerPage;
+    const end = Math.min(start + questionsPerPage, currentQuestions.length);
+    const pageQuestions = currentQuestions.slice(start, end);
+    const questionsDiv = document.getElementById('questions');
+    questionsDiv.innerHTML = '';
 
-        q.options.forEach((value, optIndex) => {
-          const optDiv = document.createElement('div');
-          optDiv.className = 'option';
-          optDiv.textContent = value;
+    pageQuestions.forEach((q, index) => {
+      const qIndex = start + index;
+      const div = document.createElement('div');
+      div.className = 'question';
+      div.innerHTML = `<h3>${qIndex + 1}. ${q.question}</h3>`;
+      const optionsDiv = document.createElement('div');
+      optionsDiv.className = 'options';
 
-          if (answers[qIndex] !== null) {
-            if (optIndex === q.answer) {
-              optDiv.classList.add('selected', 'correct');
-            } else if (optIndex === answers[qIndex]) {
-              optDiv.classList.add('selected', 'incorrect');
-            }
-            optDiv.style.cursor = 'default';
-          } else {
-            optDiv.onclick = () => selectAnswer(qIndex, optIndex, q.answer);
+      q.options.forEach((value, optIndex) => {
+        const optDiv = document.createElement('div');
+        optDiv.className = 'option';
+        optDiv.textContent = value;
+
+        if (answers[qIndex] !== null) {
+          if (optIndex === q.answer) {
+            optDiv.classList.add('selected', 'correct');
+          } else if (optIndex === answers[qIndex]) {
+            optDiv.classList.add('selected', 'incorrect');
           }
+          optDiv.style.cursor = 'default';
+        } else {
+          optDiv.onclick = () => selectAnswer(qIndex, optIndex, q.answer);
+        }
 
-          optionsDiv.appendChild(optDiv);
-        });
-
-        div.appendChild(optionsDiv);
-        questionsDiv.appendChild(div);
+        optionsDiv.appendChild(optDiv);
       });
 
-      document.getElementById('prevBtn').disabled = currentPage === 0;
-      document.getElementById('nextBtn').textContent = currentPage === totalPages - 1 ? 'Finish' : 'Next';
-      document.getElementById('score').textContent = `Score: ${score} / ${currentQuestions.length}`;
-    }
+      div.appendChild(optionsDiv);
+      questionsDiv.appendChild(div);
+    });
 
-    function selectAnswer(qIndex, selectedIndex, correctIndex) {
-      if (answers[qIndex] !== null) return;
-      answers[qIndex] = selectedIndex;
-      if (selectedIndex === correctIndex) score++;
+    document.getElementById('prevBtn').disabled = currentPage === 0;
+    document.getElementById('nextBtn').textContent = currentPage === totalPages - 1 ? 'Finish' : 'Next';
+    document.getElementById('score').textContent = `Score: ${score} / ${currentQuestions.length}`;
+  }
+
+  function selectAnswer(qIndex, selectedIndex, correctIndex) {
+    if (answers[qIndex] !== null) return;
+    answers[qIndex] = selectedIndex;
+    if (selectedIndex === correctIndex) score++;
+    loadPage();
+  }
+
+  function nextPage() {
+    if (currentPage < totalPages - 1) {
+      currentPage++;
+      loadPage();
+    } else {
+      alert(`Quiz Completed! Final Score: ${score} / ${currentQuestions.length}`);
+    }
+  }
+
+  function prevPage() {
+    if (currentPage > 0) {
+      currentPage--;
       loadPage();
     }
+  }
 
-    function nextPage() {
-      if (currentPage < totalPages - 1) {
-        currentPage++;
-        loadPage();
-      } else {
-        alert(`Quiz Completed! Final Score: ${score} / ${currentQuestions.length}`);
-      }
-    }
+  window.onload = () => {
+    noShuffle(); // or shuffleQuestions()
+  };
+</script>
 
-    function prevPage() {
-      if (currentPage > 0) {
-        currentPage--;
-        loadPage();
-      }
-    }
-
-    window.onload = () => {
-      noShuffle(); // or shuffleQuestions();
-    };
-  </script>
+  
 </body>
 </html>
+
+
+
